@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/style.css">
+  <title>Spotify Song Finder</title>
+</head>
+<body>
+  <header>
+    <h1>Spotify Song Finder</h1>
+    <form id="searchForm">
+      <input type="text" name="query" placeholder="Enter song or artist" required>
+      <button type="submit">Search</button>
+    </form>
+    <div>
+      <label for="sort">Sort by:</label>
+      <select id="sort">
+        <option value="popularity">Popularity</option>
+        <option value="release_date">Release Date</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <div id="results" class="results-container"></div>
+    <div id="loading" style="display: none;">Loading...</div>
+  </main>
+
+  <script>
+    document.getElementById("searchForm").addEventListener("submit", function(event) {
+      event.preventDefault();
+    
+      const query = document.querySelector('input[name="query"]').value;
+      const sortBy = document.getElementById('sort').value;
+    
+      // Check if the user entered a valid query
+      if (!query || query.trim() === '') {
+        alert('Please enter a valid search query.');
+        return;
+      }
+    
+      // Show loading indicator
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('results').innerHTML = ''; // Clear previous results
+    
+      // Send a POST request to the server
+      fetch('/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: query }),
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch data');
+          }
+          return response.json();
+        })
+        .then(data => {
+          // If the server returns an empty array
+          if (data.length === 0) {
+            document.getElementById('results').innerHTML = '<p>No results found.</p>';
+          } else {
+            // Sort the data based on the selected sorting method
+            if (sortBy === 'popularity') {
+              data.sort((a, b) => b.popularity - a.popularity);
+            } else if (sortBy === 'release_date') {
+              data.sort((a, b) => new Date(b.release_date) - new Date(a.release_date));
+            }
+    
+            displayResults(data);
+          }
+          document.getElementById('loading').style.display = 'none'; // Hide loading
+        })
+        .catch(error => {
+          console.error("Error fetching data:", error);
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('results').innerHTML = `<p>An error occurred while fetching data: ${error.message}</p>`;
+        });
+    });
+    
+    // Function to display the search results
+    function displayResults(results) {
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = ''; // Clear previous results
+    
+      results.forEach(result => {
+        const trackElement = document.createElement('div');
+        trackElement.classList.add('track');
+    
+        const duration = formatDuration(result.duration_ms);
+    
+        trackElement.innerHTML = `
+          <img src="${result.image}" alt="${result.name}" class="album-img">
+          <div class="track-info">
+            <strong>${result.name}</strong>
+            <p>by ${result.artists}</p>
+            <p>Album: ${result.album}</p>
+            <p>Release Date: ${result.release_date}</p>
+            <p>Duration: ${duration}</p>
+            <p><a href="${result.link}" target="_blank">Listen on Spotify</a></p>
+            ${result.preview_url ? `<audio controls><source src="${result.preview_url}" type="audio/mpeg"></audio>` : ''}
+          </div>
+        `;
+    
+        resultsDiv.appendChild(trackElement);
+      });
+    }
+    
+    // Function to format the track's duration
+    function formatDuration(ms) {
+      if (!ms) return 'Unknown'; // If duration is missing
+      const seconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+    }
+  </script>
+
+</body>
+</html>
